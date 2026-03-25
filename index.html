@@ -1,16 +1,107 @@
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<div id="video-container">
-    <video id="localVideo" autoplay muted style="width: 250px; border: 2px solid #333;"></video>
-    <video id="remoteVideo" autoplay style="width: 250px; border: 2px solid #007bff;"></video>
-</div>
+<<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Chat Platform</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
+        video { border-radius: 8px; background: #222; margin: 10px; }
+        #chat-container { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #messages { border-radius: 5px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
 
-<div id="chat-container" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; width: 500px; margin: 20px auto;">
-    <div id="messages" style="height: 200px; overflow-y: scroll; background: white; text-align: left; padding: 5px; border: 1px solid #ddd;"></div>
-    <input type="text" id="chat-input" placeholder="Напиши съобщение..." style="width: 80%;">
-    <button onclick="sendMessage()">Изпрати</button>
-</div>
+    <h2>Моята Видео Среща</h2>
 
-<div style="margin-top: 10px;">
-    <input type="text" id="share-link" readonly style="width: 400px;">
-    <button onclick="copyLink()">Копирай линка за покана</button>
-</div>
+    <div id="video-container">
+        <video id="localVideo" autoplay muted style="width: 250px; border: 2px solid #333;"></video>
+        <video id="remoteVideo" autoplay style="width: 250px; border: 2px solid #007bff;"></video>
+    </div>
+
+    <div id="chat-container" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; width: 90%; max-width: 500px; margin: 20px auto;">
+        <div id="messages" style="height: 200px; overflow-y: scroll; background: white; text-align: left; padding: 5px; border: 1px solid #ddd;"></div>
+        <input type="text" id="chat-input" placeholder="Напиши съобщение..." style="width: 70%; padding: 5px;">
+        <button id="send-btn">Изпрати</button>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <input type="text" id="share-link" readonly style="width: 300px; padding: 5px;" placeholder="Генериране на линк...">
+        <button onclick="copyLink()">Копирай линка за покана</button>
+    </div>
+
+    <script>
+        // --- 1. ФУНКЦИЯ ЗА КОПИРАНЕ ---
+        function copyLink() {
+            const copyText = document.getElementById("share-link");
+            if (copyText && copyText.value !== "") {
+                copyText.select();
+                copyText.setSelectionRange(0, 99999);
+                navigator.clipboard.writeText(copyText.value);
+                alert("Линкът е копиран!");
+            } else {
+                alert("Изчакайте, линкът още се генерира...");
+            }
+        }
+
+        // --- 2. ЛОГИКА ЗА СЪОБЩЕНИЯТА ---
+        function displayMessage(text) {
+            const msgDiv = document.getElementById('messages');
+            const newMsg = document.createElement('div');
+            newMsg.textContent = text;
+            msgDiv.appendChild(newMsg);
+            msgDiv.scrollTop = msgDiv.scrollHeight;
+        }
+
+        // --- 3. PEERJS ЛОГИКА ---
+        const peer = new Peer();
+        let currentConn;
+
+        peer.on('open', (id) => {
+            console.log('Моето ID е: ' + id);
+            // Генериране на автоматичния линк
+            const url = window.location.href.split('?')[0];
+            document.getElementById('share-link').value = url + '?room=' + id;
+
+            // Автоматично свързване, ако влезем през линк
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomToJoin = urlParams.get('room');
+            if (roomToJoin) {
+                const conn = peer.connect(roomToJoin);
+                setupChatHandlers(conn);
+            }
+        });
+
+        peer.on('connection', (conn) => {
+            setupChatHandlers(conn);
+        });
+
+        function setupChatHandlers(conn) {
+            currentConn = conn;
+            conn.on('data', (data) => {
+                displayMessage("Приятел: " + data);
+            });
+        }
+
+        document.getElementById('send-btn').onclick = function() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value;
+            if (currentConn && msg) {
+                currentConn.send(msg);
+                displayMessage("Аз: " + msg);
+                input.value = "";
+            }
+        };
+
+        // Камера
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                document.getElementById('localVideo').srcObject = stream;
+            })
+            .catch(err => console.error("Грешка с камерата:", err));
+
+    </script>
+</body>
+</html>
