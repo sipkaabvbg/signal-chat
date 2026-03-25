@@ -3,21 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Platform Pro</title>
+    <title>Video Platform Final</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 10px; }
-        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-        video { width: 100%; max-width: 350px; background: black; border-radius: 10px; border: 2px solid #ccc; }
-        #chat-box { height: 150px; border: 1px solid #ddd; overflow-y: auto; background: white; margin: 10px auto; max-width: 500px; padding: 10px; text-align: left; }
-        .controls { margin-top: 15px; }
-        input { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; margin: 5px; }
+        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 10px; margin: 0; }
+        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
+        video { width: 100%; max-width: 340px; background: black; border-radius: 10px; border: 2px solid #333; height: 255px; object-fit: cover; }
+        #chat-box { height: 150px; border: 1px solid #ddd; overflow-y: auto; background: white; margin: 10px auto; max-width: 500px; padding: 10px; text-align: left; font-size: 14px; border-radius: 8px; }
+        .controls { background: white; padding: 15px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input { padding: 8px; width: 70%; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 5px; }
+        button { padding: 10px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; margin: 3px; font-weight: bold; }
+        button.screen { background: #28a745; }
     </style>
 </head>
 <body>
 
-    <h2>Видео Среща</h2>
+    <h2>Видео Чат</h2>
 
     <div class="video-container">
         <video id="localVideo" autoplay muted playsinline></video>
@@ -25,104 +26,121 @@
     </div>
 
     <div id="chat-box"></div>
-    <input type="text" id="chat-input" placeholder="Напиши съобщение...">
-    <button onclick="sendMsg()">Изпрати</button>
-
+    
     <div class="controls">
-        <p>Линк за покана:</p>
-        <input type="text" id="share-link" readonly>
+        <input type="text" id="chat-input" placeholder="Напиши съобщение...">
+        <button onclick="sendMsg()">Изпрати</button>
+        <hr>
+        <p style="font-size: 12px; color: #666;">Линк за приятел:</p>
+        <input type="text" id="share-link" readonly onclick="this.select()">
         <button onclick="copyLink()">Копирай</button>
-        <button onclick="shareScreen()" style="background: green;">Екран</button>
+        <button class="screen" onclick="shareScreen()">Сподели Екран</button>
     </div>
 
 <script>
-const peer = new Peer();
-let localStream;
-let currentConn;
+    let localStream;
+    let currentConn;
+    let peer;
 
-// 1. Вземи камерата
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    .then(stream => {
-        localStream = stream;
-        document.getElementById('localVideo').srcObject = stream;
-    });
+    // СТЪПКА 1: Първо пускаме камерата
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+            localStream = stream;
+            document.getElementById('localVideo').srcObject = stream;
+            
+            // СТЪПКА 2: Чак когато камерата е готова, пускаме PeerJS
+            initPeer();
+        })
+        .catch(err => {
+            alert("Грешка: Трябва да разрешите камерата!");
+            console.error(err);
+        });
 
-peer.on('open', (id) => {
-    const url = window.location.origin + window.location.pathname + '?room=' + id;
-    document.getElementById('share-link').value = url;
+    function initPeer() {
+        peer = new Peer();
 
-    // Проверка за стая
-    const room = new URLSearchParams(window.location.search).get('room');
-    if (room) {
-        // Изчакваме половин секунда, за да сме сигурни, че мрежата е готова
-        setTimeout(() => {
-            connectToPeer(room);
-        }, 500);
+        peer.on('open', (id) => {
+            const url = window.location.origin + window.location.pathname + '?room=' + id;
+            document.getElementById('share-link').value = url;
+
+            const room = new URLSearchParams(window.location.search).get('room');
+            if (room) {
+                // Ако сме влезли през линк, звъним автоматично
+                connectToPeer(room);
+            }
+        });
+
+        // Когато някой ни потърси (за Лаптопа)
+        peer.on('call', (call) => {
+            call.answer(localStream);
+            call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
+        });
+
+        peer.on('connection', (conn) => {
+            setupChat(conn);
+        });
     }
-});
 
-// Функцията, която прави връзката
-function connectToPeer(roomId) {
-    console.log("Опит за връзка с: " + roomId);
-    
-    // Видео
-    const call = peer.call(roomId, localStream);
-    call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
-    
-    // Чат
-    const conn = peer.connect(roomId);
-    setupChat(conn);
-}
-
-// Приемане на обаждане (за Лаптопа)
-peer.on('call', call => {
-    call.answer(localStream);
-    call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
-});
-
-peer.on('connection', conn => {
-    setupChat(conn);
-});
-
-function setupChat(conn) {
-    currentConn = conn;
-    conn.on('open', () => {
-        console.log("Свързани!");
-        addMsg("Система", "Участникът се присъедини.");
-    });
-    conn.on('data', data => addMsg("Приятел", data));
-}
-
-function sendMsg() {
-    const input = document.getElementById('chat-input');
-    if (currentConn && currentConn.open) { // Проверка дали връзката е отворена
-        currentConn.send(input.value);
-        addMsg("Аз", input.value);
-        input.value = "";
-    } else {
-        alert("Връзката още се установява... Изчакайте 2 секунди.");
+    function connectToPeer(roomId) {
+        // Видео връзка
+        const call = peer.call(roomId, localStream);
+        call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
+        
+        // Чат връзка
+        const conn = peer.connect(roomId);
+        setupChat(conn);
     }
-}
 
-function addMsg(user, text) {
-    const box = document.getElementById('chat-box');
-    box.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
-    box.scrollTop = box.scrollHeight;
-}
+    function setupChat(conn) {
+        currentConn = conn;
+        conn.on('open', () => addMsg("Система", "Свързани за чат!"));
+        conn.on('data', data => addMsg("Приятел", data));
+    }
+
+    function sendMsg() {
+        const input = document.getElementById('chat-input');
+        if (currentConn && currentConn.open) {
+            currentConn.send(input.value);
+            addMsg("Аз", input.value);
+            input.value = "";
+        } else {
+            alert("Все още няма връзка с друг потребител!");
+        }
+    }
+
+    function addMsg(user, text) {
+        const box = document.getElementById('chat-box');
+        box.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
 
     function copyLink() {
         const el = document.getElementById('share-link');
         el.select();
-        document.execCommand('copy');
-        alert("Копирано!");
+        navigator.clipboard.writeText(el.value);
+        alert("Линкът е копиран!");
     }
 
     async function shareScreen() {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const videoTrack = screenStream.getVideoTracks()[0];
+            
+            // Сменяме видеото локално
             document.getElementById('localVideo').srcObject = screenStream;
-            // Тук трябва да се подмени тракът (както в предишния код), но за тест виж дали работи локално първо
-        } catch (e) {}
+
+            // Сменяме го и за другия човек
+            if (peer.connections) {
+                for (let id in peer.connections) {
+                    peer.connections[id].forEach(c => {
+                        if (c.peerConnection) {
+                            const sender = c.peerConnection.getSenders().find(s => s.track.kind === 'video');
+                            if (sender) sender.replaceTrack(videoTrack);
+                        }
+                    });
+                }
+            }
+        } catch (e) { console.error(e); }
     }
 </script>
 </body>
