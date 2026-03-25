@@ -36,78 +36,79 @@
     </div>
 
 <script>
-    let localStream;
-    let currentConn;
-    const peer = new Peer({
-        debug: 2 // Това ще ни показва грешки в конзолата (F12)
+const peer = new Peer();
+let localStream;
+let currentConn;
+
+// 1. Вземи камерата
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    .then(stream => {
+        localStream = stream;
+        document.getElementById('localVideo').srcObject = stream;
     });
 
-    // 1. Вземи камерата
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-        .then(stream => {
-            localStream = stream;
-            document.getElementById('localVideo').srcObject = stream;
-        })
-        .catch(err => alert("Грешка с камерата: " + err));
+peer.on('open', (id) => {
+    const url = window.location.origin + window.location.pathname + '?room=' + id;
+    document.getElementById('share-link').value = url;
 
-    // 2. Генерирай линк
-    peer.on('open', (id) => {
-        const url = window.location.href.split('?')[0] + '?room=' + id;
-        document.getElementById('share-link').value = url;
+    // Проверка за стая
+    const room = new URLSearchParams(window.location.search).get('room');
+    if (room) {
+        // Изчакваме половин секунда, за да сме сигурни, че мрежата е готова
+        setTimeout(() => {
+            connectToPeer(room);
+        }, 500);
+    }
+});
 
-        // Ако влизаме през линк:
-        const room = new URLSearchParams(window.location.search).get('room');
-        if (room) {
-            console.log("Звъня на: " + room);
-            startConnection(room);
-        }
+// Функцията, която прави връзката
+function connectToPeer(roomId) {
+    console.log("Опит за връзка с: " + roomId);
+    
+    // Видео
+    const call = peer.call(roomId, localStream);
+    call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
+    
+    // Чат
+    const conn = peer.connect(roomId);
+    setupChat(conn);
+}
+
+// Приемане на обаждане (за Лаптопа)
+peer.on('call', call => {
+    call.answer(localStream);
+    call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
+});
+
+peer.on('connection', conn => {
+    setupChat(conn);
+});
+
+function setupChat(conn) {
+    currentConn = conn;
+    conn.on('open', () => {
+        console.log("Свързани!");
+        addMsg("Система", "Участникът се присъедини.");
     });
+    conn.on('data', data => addMsg("Приятел", data));
+}
 
-    // Когато някой ни потърси
-    peer.on('call', (call) => {
-        call.answer(localStream);
-        call.on('stream', stream => {
-            document.getElementById('remoteVideo').srcObject = stream;
-        });
-    });
-
-    peer.on('connection', (conn) => {
-        setupChat(conn);
-    });
-
-    function startConnection(roomId) {
-        // Видео
-        const call = peer.call(roomId, localStream);
-        call.on('stream', stream => {
-            document.getElementById('remoteVideo').srcObject = stream;
-        });
-        // Чат
-        const conn = peer.connect(roomId);
-        setupChat(conn);
+function sendMsg() {
+    const input = document.getElementById('chat-input');
+    if (currentConn && currentConn.open) { // Проверка дали връзката е отворена
+        currentConn.send(input.value);
+        addMsg("Аз", input.value);
+        input.value = "";
+    } else {
+        alert("Връзката още се установява... Изчакайте 2 секунди.");
     }
+}
 
-    function setupChat(conn) {
-        currentConn = conn;
-        conn.on('open', () => console.log("Чатът е свързан!"));
-        conn.on('data', data => addMsg("Приятел", data));
-    }
-
-    function sendMsg() {
-        const input = document.getElementById('chat-input');
-        if (currentConn && input.value) {
-            currentConn.send(input.value);
-            addMsg("Аз", input.value);
-            input.value = "";
-        } else {
-            alert("Няма свързан участник за чат!");
-        }
-    }
-
-    function addMsg(user, text) {
-        const box = document.getElementById('chat-box');
-        box.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
-        box.scrollTop = box.scrollHeight;
-    }
+function addMsg(user, text) {
+    const box = document.getElementById('chat-box');
+    box.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
+    box.scrollTop = box.scrollHeight;
+}
 
     function copyLink() {
         const el = document.getElementById('share-link');
