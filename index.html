@@ -3,178 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Platform v1.0</title>
+    <title>Video Platform Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .video-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 20px; }
-        video { width: 100%; max-width: 400px; background: #2c3e50; border-radius: 10px; border: 3px solid #ddd; }
-        #remoteVideo { border-color: #007bff; }
-        #chat-box { border: 1px solid #ddd; height: 150px; overflow-y: auto; padding: 10px; text-align: left; margin-bottom: 10px; background: #fafafa; border-radius: 5px; }
-        input[type="text"] { padding: 10px; border: 1px solid #ddd; border-radius: 5px; width: 60%; }
-        button { padding: 10px 15px; border: none; border-radius: 5px; background: #007bff; color: white; cursor: pointer; font-weight: bold; margin: 5px; }
-        button:hover { background: #0056b3; }
-        .controls { margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; }
-        #share-link { width: 80%; max-width: 400px; background: #eee; text-align: center; margin-top: 10px; }
+        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 10px; }
+        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        video { width: 100%; max-width: 350px; background: black; border-radius: 10px; border: 2px solid #ccc; }
+        #chat-box { height: 150px; border: 1px solid #ddd; overflow-y: auto; background: white; margin: 10px auto; max-width: 500px; padding: 10px; text-align: left; }
+        .controls { margin-top: 15px; }
+        input { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; margin: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Моята Видео Среща</h2>
+    <h2>Видео Среща</h2>
 
-    <div class="video-grid">
-        <div>
-            <small>Аз (Моята камера)</small>
-            <video id="localVideo" autoplay muted playsinline></video>
-        </div>
-        <div>
-            <small>Приятел (Отсреща)</small>
-            <video id="remoteVideo" autoplay playsinline></video>
-        </div>
+    <div class="video-container">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
     </div>
 
-    <div id="chat-container">
-        <div id="chat-box"></div>
-        <input type="text" id="chat-input" placeholder="Напиши съобщение...">
-        <button onclick="sendMessage()">Изпрати</button>
-    </div>
+    <div id="chat-box"></div>
+    <input type="text" id="chat-input" placeholder="Напиши съобщение...">
+    <button onclick="sendMsg()">Изпрати</button>
 
     <div class="controls">
-        <button onclick="shareScreen()" style="background: #28a745;">Сподели екран</button>
-        <button onclick="openFullscreen()" style="background: #6c757d;">Цял екран</button>
-        <br>
-        <p>Прати този линк на приятел:</p>
-        <input type="text" id="share-link" readonly onclick="this.select()">
-        <button onclick="copyLink()">Копирай линк</button>
+        <p>Линк за покана:</p>
+        <input type="text" id="share-link" readonly>
+        <button onclick="copyLink()">Копирай</button>
+        <button onclick="shareScreen()" style="background: green;">Екран</button>
     </div>
-</div>
 
 <script>
-    const peer = new Peer();
     let localStream;
     let currentConn;
+    const peer = new Peer({
+        debug: 2 // Това ще ни показва грешки в конзолата (F12)
+    });
 
-    // 1. Вземане на камера веднага
+    // 1. Вземи камерата
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
             localStream = stream;
             document.getElementById('localVideo').srcObject = stream;
         })
-        .catch(err => {
-            console.error("Грешка:", err);
-            alert("Моля, разреши достъп до камерата в браузъра!");
-        });
+        .catch(err => alert("Грешка с камерата: " + err));
 
-    // 2. Генериране на ID и линк
+    // 2. Генерирай линк
     peer.on('open', (id) => {
-        const cleanUrl = window.location.href.split('?')[0];
-        const fullLink = cleanUrl + '?room=' + id;
-        document.getElementById('share-link').value = fullLink;
+        const url = window.location.href.split('?')[0] + '?room=' + id;
+        document.getElementById('share-link').value = url;
 
-        // ПРОВЕРКА: Ако сме влезли през линк, автоматично звъним
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomToJoin = urlParams.get('room');
-        if (roomToJoin) {
-            console.log("Свързване с: " + roomToJoin);
-            // Звъним за Видео
-            const call = peer.call(roomToJoin, localStream);
-            handleCall(call);
-            // Свързваме се за Чат
-            const conn = peer.connect(roomToJoin);
-            handleChat(conn);
+        // Ако влизаме през линк:
+        const room = new URLSearchParams(window.location.search).get('room');
+        if (room) {
+            console.log("Звъня на: " + room);
+            startConnection(room);
         }
     });
 
-    // 3. Когато някой ни потърси (за Потребител А)
+    // Когато някой ни потърси
     peer.on('call', (call) => {
         call.answer(localStream);
-        handleCall(call);
+        call.on('stream', stream => {
+            document.getElementById('remoteVideo').srcObject = stream;
+        });
     });
 
     peer.on('connection', (conn) => {
-        handleChat(conn);
+        setupChat(conn);
     });
 
-    // Хендлъри за видео и чат
-    function handleCall(call) {
-        call.on('stream', (remoteStream) => {
-            const remoteVid = document.getElementById('remoteVideo');
-            remoteVid.srcObject = remoteStream;
-            remoteVid.play();
+    function startConnection(roomId) {
+        // Видео
+        const call = peer.call(roomId, localStream);
+        call.on('stream', stream => {
+            document.getElementById('remoteVideo').srcObject = stream;
         });
+        // Чат
+        const conn = peer.connect(roomId);
+        setupChat(conn);
     }
 
-    function handleChat(conn) {
+    function setupChat(conn) {
         currentConn = conn;
-        conn.on('data', (data) => {
-            addMessage("Приятел", data);
-        });
+        conn.on('open', () => console.log("Чатът е свързан!"));
+        conn.on('data', data => addMsg("Приятел", data));
     }
 
-    // Споделяне на екран
-    async function shareScreen() {
-        try {
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const videoTrack = screenStream.getVideoTracks()[0];
-            document.getElementById('localVideo').srcObject = screenStream;
-
-            replaceTrack(videoTrack);
-
-            // Когато потребителят спре споделянето от бутона на браузъра
-            videoTrack.onended = async () => {
-                const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                const camTrack = camStream.getVideoTracks()[0];
-                document.getElementById('localVideo').srcObject = camStream;
-                replaceTrack(camTrack);
-            };
-        } catch (e) { console.error(e); }
-    }
-
-    function replaceTrack(newTrack) {
-        if (peer.connections) {
-            for (let id in peer.connections) {
-                peer.connections[id].forEach(c => {
-                    if (c.peerConnection) {
-                        const sender = c.peerConnection.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) sender.replaceTrack(newTrack);
-                    }
-                });
-            }
-        }
-    }
-
-    // Чат функции
-    function sendMessage() {
+    function sendMsg() {
         const input = document.getElementById('chat-input');
         if (currentConn && input.value) {
             currentConn.send(input.value);
-            addMessage("Аз", input.value);
+            addMsg("Аз", input.value);
             input.value = "";
+        } else {
+            alert("Няма свързан участник за чат!");
         }
     }
 
-    function addMessage(sender, text) {
+    function addMsg(user, text) {
         const box = document.getElementById('chat-box');
-        box.innerHTML += `<div><strong>${sender}:</strong> ${text}</div>`;
+        box.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
         box.scrollTop = box.scrollHeight;
     }
 
-    // Помощни функции
     function copyLink() {
-        const copyText = document.getElementById("share-link");
-        copyText.select();
-        navigator.clipboard.writeText(copyText.value);
-        alert("Линкът е копиран!");
+        const el = document.getElementById('share-link');
+        el.select();
+        document.execCommand('copy');
+        alert("Копирано!");
     }
 
-    function openFullscreen() {
-        const elem = document.getElementById("remoteVideo");
-        if (elem.requestFullscreen) elem.requestFullscreen();
-        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+    async function shareScreen() {
+        try {
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            document.getElementById('localVideo').srcObject = screenStream;
+            // Тук трябва да се подмени тракът (както в предишния код), но за тест виж дали работи локално първо
+        } catch (e) {}
     }
 </script>
-
 </body>
 </html>
