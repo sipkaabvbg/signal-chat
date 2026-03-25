@@ -121,27 +121,59 @@
         alert("Линкът е копиран!");
     }
 
-    async function shareScreen() {
-        try {
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const videoTrack = screenStream.getVideoTracks()[0];
-            
-            // Сменяме видеото локално
-            document.getElementById('localVideo').srcObject = screenStream;
+  async function shareScreen() {
+    try {
+        // 1. Стартираме споделянето на екран
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const videoTrack = screenStream.getVideoTracks()[0];
+        
+        // Показваме екрана в малкото прозорче
+        document.getElementById('localVideo').srcObject = screenStream;
 
-            // Сменяме го и за другия човек
-            if (peer.connections) {
-                for (let id in peer.connections) {
-                    peer.connections[id].forEach(c => {
-                        if (c.peerConnection) {
-                            const sender = c.peerConnection.getSenders().find(s => s.track.kind === 'video');
-                            if (sender) sender.replaceTrack(videoTrack);
-                        }
-                    });
-                }
+        // Изпращаме екрана към другия човек
+        replaceTrack(videoTrack);
+
+        // 2. МАГИЯТА: Какво става, когато натиснеш "Stop Sharing" от лентата на браузъра
+        videoTrack.onended = async () => {
+            try {
+                // Вземаме ПРЯСЪК поток от камерата
+                const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localStream = camStream; // Обновяваме глобалната променлива
+                
+                // Закачаме го обратно към прозорчето
+                const vElement = document.getElementById('localVideo');
+                vElement.srcObject = camStream;
+                vElement.play(); // За всеки случай го караме да тръгне
+
+                // Пращаме камерата обратно на другия човек
+                const camTrack = camStream.getVideoTracks()[0];
+                replaceTrack(camTrack);
+                
+                console.log("Камерата е възстановена успешно.");
+            } catch (err) {
+                console.error("Неуспешно връщане на камерата:", err);
             }
-        } catch (e) { console.error(e); }
+        };
+    } catch (e) { 
+        console.error("Грешка при споделяне:", e); 
     }
+}
+
+// Помощна функция за подмяна на трак (увери се, че я имаш)
+function replaceTrack(newTrack) {
+    if (peer && peer.connections) {
+        for (let id in peer.connections) {
+            peer.connections[id].forEach(c => {
+                if (c.peerConnection) {
+                    const sender = c.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(newTrack);
+                    }
+                }
+            });
+        }
+    }
+}
 </script>
 </body>
 </html>
