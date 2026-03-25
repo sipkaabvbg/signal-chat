@@ -6,14 +6,45 @@
     <title>Video Platform Final</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 10px; margin: 0; }
-        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
-        video { width: 100%; max-width: 340px; background: black; border-radius: 10px; border: 2px solid #333; height: 255px; object-fit: cover; }
-        #chat-box { height: 150px; border: 1px solid #ddd; overflow-y: auto; background: white; margin: 10px auto; max-width: 500px; padding: 10px; text-align: left; font-size: 14px; border-radius: 8px; }
-        .controls { background: white; padding: 15px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        input { padding: 8px; width: 70%; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 5px; }
-        button { padding: 10px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; margin: 3px; font-weight: bold; }
-        button.screen { background: #28a745; }
+        /* Контейнерът за видеата */
+.video-container { 
+    display: flex; 
+    flex-direction: column; /* Подреждаме ги едно под друго за по-лесно управление */
+    align-items: center; 
+    gap: 15px; 
+}
+
+/* Видеото на другия участник - ГЛАВНО */
+#remoteVideo { 
+    width: 95vw; /* Заема 95% от ширината на екрана */
+    max-width: 1000px; /* Но не повече от 1000px */
+    height: auto; 
+    max-height: 70vh; /* Заема до 70% от височината на екрана */
+    border: 3px solid #007bff; 
+    background: #000;
+}
+
+/* Твоето видео - МАЛКО */
+#localVideo { 
+    width: 200px; 
+    height: 150px; 
+    position: fixed; /* Застава над всичко останало */
+    bottom: 20px; 
+    right: 20px; 
+    z-index: 10;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* Адаптация за телефони */
+@media (max-width: 600px) {
+    #localVideo {
+        width: 120px;
+        height: 90px;
+        bottom: 10px;
+        right: 10px;
+    }
+}
     </style>
 </head>
 <body>
