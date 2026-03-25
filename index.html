@@ -1,9 +1,15 @@
-<script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+<div id="video-container">
+    <video id="localVideo" autoplay muted style="width: 250px; border: 2px solid #333;"></video>
+    <video id="remoteVideo" autoplay style="width: 250px; border: 2px solid #007bff;"></video>
+</div>
 
-<video id="localVideo" autoplay muted style="width: 300px;"></video>
-<video id="remoteVideo" autoplay style="width: 300px;"></video>
+<div id="chat-container" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; width: 500px; margin: 20px auto;">
+    <div id="messages" style="height: 200px; overflow-y: scroll; background: white; text-align: left; padding: 5px; border: 1px solid #ddd;"></div>
+    <input type="text" id="chat-input" placeholder="Напиши съобщение..." style="width: 80%;">
+    <button onclick="sendMessage()">Изпрати</button>
+</div>
 
-<input type="text" id="peer-id" placeholder="ID на приятел">
-<button onclick="makeCall()">Обади се</button>
-
-<p>Твоето ID е: <span id="my-id">...</span></p>
+<div style="margin-top: 10px;">
+    <input type="text" id="share-link" readonly style="width: 400px;">
+    <button onclick="copyLink()">Копирай линка за покана</button>
+</div>
