@@ -31,7 +31,10 @@
         <input type="text" id="share-link" readonly style="width: 300px; padding: 5px;" placeholder="Генериране на линк...">
         <button onclick="copyLink()">Копирай линка за покана</button>
     </div>
-
+	 <div style="margin-top: 10px;">
+   
+<button onclick="shareScreen()">Сподели екран</button>
+ </div>
     <script>
         // --- 1. ФУНКЦИЯ ЗА КОПИРАНЕ ---
         function copyLink() {
@@ -101,7 +104,42 @@
                 document.getElementById('localVideo').srcObject = stream;
             })
             .catch(err => console.error("Грешка с камерата:", err));
+async function shareScreen() {
+    try {
+        // Показва системния прозорец за избор на екран/таб
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true // Позволява и споделяне на системния звук (ако браузърът поддържа)
+        });
 
+        // 1. Показваме екрана в нашия малък прозорец (localVideo)
+        const videoTrack = screenStream.getVideoTracks()[0];
+        document.getElementById('localVideo').srcObject = screenStream;
+
+        // 2. АКО В МОМЕНТА ИМАШ ПРОВЕДЕНО ОБАЖДАНЕ:
+        // Трябва да заменим "картината" от камерата с "картината" от екрана за другия човек
+        if (peer.connections) {
+            for (let connId in peer.connections) {
+                const conn = peer.connections[connId];
+                conn.forEach(c => {
+                    if (c.peerConnection) {
+                        const sender = c.peerConnection.getSenders().find(s => s.track.kind === 'video');
+                        if (sender) sender.replaceTrack(videoTrack);
+                    }
+                });
+            }
+        }
+
+        // Когато спреш споделянето от системния бутон на браузъра:
+        videoTrack.onended = () => {
+            alert("Споделянето на екрана спря.");
+            // Тук можеш да върнеш камерата обратно, ако искаш
+        };
+
+    } catch (err) {
+        console.error("Грешка при споделяне на екран: ", err);
+    }
+}
     </script>
 </body>
 </html>
